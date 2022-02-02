@@ -330,7 +330,7 @@ int main(int argc, char** argv) {
     }
 
 
-    printf("%s", program);
+    //printf("%s", program);
 
     program_code = program;
     cs = callstack_new_empty();
