@@ -133,6 +133,9 @@ static void opcodes(const char* pos) {
                           jmp = 1;
                       }
 
+                      number_destroy(acc);
+                      number_destroy(var_n);
+
                       if (jmp) {
                           struct instruction_pointer* cur = callstack_pop(cs);
                           if (!instruction_pointer_is_in_function(cur)) {
