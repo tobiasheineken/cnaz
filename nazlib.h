@@ -53,7 +53,6 @@ struct number* number_from(int i);
 void number_add(struct number*, int);
 void number_divide(struct number*, int);
 void number_multiply(struct number*, int);
-void number_negate(struct number*, int);
 void number_remainder(struct number*, int);
 
 void number_print(struct number*);

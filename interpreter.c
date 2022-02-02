@@ -257,6 +257,13 @@ static void execute() {
                               accumulator_set(var);
                               break;
                           }
+                case 'n': {
+                              int number = next_code[offset] - '0';
+                              struct number *var = variable_get(number);
+                              number_multiply(var, -1);
+                              variable_set(number, var);
+                              break;
+                          }
                 default: die("unknown char for interpreter loop");
             }
             offset++;
