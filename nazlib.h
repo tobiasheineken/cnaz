@@ -85,3 +85,7 @@ const char* function_set(int number, const char*);
 void function_cleanup();
 
 _Noreturn void die(const char msg[]);
+
+/** -u */
+/* Has to be called before variable_init() */
+void naz_set_unlimited(int);

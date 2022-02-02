@@ -26,6 +26,9 @@ struct instruction_pointer {
     struct instruction_pointer* next;
 };
 
+
+static int unlimited_numbers = 0;
+
 struct instruction_pointer* instruction_pointer_from_function(int function, int offset) {
     struct instruction_pointer *out = malloc(sizeof(*out));
     out->function = function;
@@ -95,39 +98,92 @@ void callstack_destroy(struct callstack *cs) {
     free(cs);
 }
 
-struct number {
+struct lnumber {
     long long val;
     /* TODO */
 };
+struct unumber {
+};
 
+struct number {
+    union {
+        struct lnumber* lptr;
+        struct unumber* uptr;
+    };
+};
 
-struct number* number_from(int i) {
-    struct number* out = malloc(sizeof(*out));
+static struct lnumber* lnumber_from(int i) {
+    struct lnumber* out = malloc(sizeof(*out));
     out->val = i;
     return out;
 }
 
+struct number* number_from(int i) {
+    struct number* out = malloc(sizeof(*out));
+    if (unlimited_numbers) {
+        die("unlimited_numbers are not implemented");
+    } else {
+        out->lptr = lnumber_from(i);
+    }
+    return out;
+}
+
+
 struct number* number_invalid() {
+    if (unlimited_numbers) {
+        die("unlimited_numbers are not implemented 2");
+    }
     return number_from(-128);
+}
+
+static struct lnumber* lnumber_copy(struct lnumber* in) {
+    struct lnumber* out = malloc(sizeof(*out));
+    out->val = in->val;
+    return out;
+}
+
+static struct unumber* unumber_copy(struct unumber* in) {
+    /* TODO */
+    die("unumber copy is not implemented");
 }
 
 struct number* number_copy(struct number* in) {
     struct number* out = malloc(sizeof(*out));
-    out->val = in->val; /* TODO */
+    if (unlimited_numbers) {
+        out->uptr = unumber_copy(in->uptr);
+    } else {
+        out->lptr = lnumber_copy(in->lptr);
+    }
     return out;
 }
 
-void number_add(struct number* in, int i) {
+static void lnumber_add(struct lnumber* in, int i) {
     in->val += i;
     if (in->val < -127 || in->val > 127) {
         die("invalid result");
     }
 }
 
-void number_multiply(struct number* in, int i) {
+void number_add(struct number* in, int i) {
+    if (unlimited_numbers) {
+        die("unlimited_numbers are not implemented 3");
+    } else {
+        lnumber_add(in->lptr, i);
+    }
+}
+
+static void lnumber_multiply(struct lnumber* in, int i) {
     in->val *= i;
     if (in->val < -127 || in->val > 127) {
         die("invalid result");
+    }
+}
+
+void number_multiply(struct number* in, int i) {
+    if (unlimited_numbers) {
+        die("unlimited_numbers are not implemented 4");
+    } else {
+        lnumber_multiply(in->lptr, i);
     }
 }
 
@@ -143,18 +199,47 @@ static long long divide_round_down(long long val, int rhs) {
     return res - 1;
 }
 
-void number_divide(struct number* in, int i) {
+static void lnumber_divide(struct lnumber* in, int i) {
     in->val = divide_round_down(in->val, i);
 }
-void number_remainder(struct number* in, int i) {
+
+void number_divide(struct number* in, int i) {
+    if (unlimited_numbers) {
+        die("unlimited numbers are not implemented 5");
+    } else {
+        lnumber_divide(in->lptr, i);
+    }
+}
+static void lnumber_remainder(struct lnumber* in, int i) {
     in->val %= i;
 }
 
-void number_destroy(struct number* in) {
+void number_remainder(struct number* in, int i) {
+    if (unlimited_numbers) {
+        die("unlimited numbers are not implemented 6");
+    } else {
+        lnumber_remainder(in->lptr, i);
+    }
+}
+
+static void lnumber_destroy(struct lnumber* in) {
     free(in);
 }
 
-void number_print(struct number* in) {
+static void unumber_destroy(struct unumber* in) {
+    die("unlimited numbers are not destroyable");
+}
+
+void number_destroy(struct number* in) {
+    if (unlimited_numbers) {
+        unumber_destroy(in->uptr);
+    } else {
+        lnumber_destroy(in->lptr);
+    }
+    free(in);
+}
+
+static void lnumber_print(struct lnumber* in) {
     if (in->val >= 0 && in-> val < 10) {
         printf("%lld", in->val);
         return;
@@ -166,12 +251,40 @@ void number_print(struct number* in) {
     die("trying to print unknown number");
 }
 
-void number_print_dbg(struct number* in) {
+void number_print(struct number* in) {
+    if(unlimited_numbers) {
+        die("unlimited numbers are not implemented 7");
+    } else {
+        lnumber_print(in->lptr);
+    }
+}
+
+static void lnumber_print_dbg(struct lnumber* in) {
     printf("%lld", in->val);
 }
 
-int number_compare(struct number* lhs, struct number* rhs) {
+void number_print_dbg(struct number* in) {
+    if (unlimited_numbers) {
+        die("unlimted numbers are not implemented 8");
+    } else {
+        lnumber_print_dbg(in->lptr);
+    }
+}
+
+static int lnumber_compare(struct lnumber* lhs, struct lnumber* rhs) {
     return lhs->val - rhs->val;
+}
+
+static int unumber_compare(struct unumber* lhs, struct unumber* rhs) {
+    die("unlimited compare is not implemented");
+}
+
+int number_compare(struct number* lhs, struct number* rhs) {
+    if (unlimited_numbers) {
+        return unumber_compare(lhs->uptr, rhs->uptr);
+    } else {
+        return lnumber_compare(lhs->lptr, rhs->lptr);
+    }
 }
 
 
@@ -256,4 +369,8 @@ void function_cleanup() {
         free(functions[i]);
         functions[i] = NULL;
     }
+}
+
+void naz_set_unlimited(int in) {
+    unlimited_numbers = in;
 }
