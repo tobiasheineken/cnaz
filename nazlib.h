@@ -45,7 +45,6 @@ void callstack_destroy(struct callstack*);
 
 /** NUMBERS */
 struct number;
-/* TODO: unclear what needed */
 struct number* number_copy(struct number*);
 struct number* number_invalid();
 struct number* number_from(int i);
