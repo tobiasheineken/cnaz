@@ -17,7 +17,7 @@ $ ./interpreter filename.naz
 This reposity is currently only written for UNIX and only tested on Debian / Ubuntu.
 
 ## Differences
-Currently, cnzar can only run a subset of naz programms.
+Currently, cnaz can only run a subset of naz programms.
 The following list shows all the additional restriction for naz programs to be executed by cnaz:
 
 - The only supported read operation is `1r`. Reading a different character from stdin is not supported

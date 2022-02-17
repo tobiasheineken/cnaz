@@ -18,6 +18,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <limits.h>
+#include <string.h>
 #include "nazlib.h"
 
 struct instruction_pointer {
@@ -28,6 +30,7 @@ struct instruction_pointer {
 
 
 static int unlimited_numbers = 0;
+static int debug = 0;
 
 struct instruction_pointer* instruction_pointer_from_function(int function, int offset) {
     struct instruction_pointer *out = malloc(sizeof(*out));
@@ -100,9 +103,12 @@ void callstack_destroy(struct callstack *cs) {
 
 struct lnumber {
     long long val;
-    /* TODO */
 };
 struct unumber {
+    size_t len;
+    size_t cap;
+    unsigned int* data;
+    int negative;
 };
 
 struct number {
@@ -111,6 +117,7 @@ struct number {
         struct unumber* uptr;
     };
 };
+static void unumber_destroy(struct unumber* in);
 
 static struct lnumber* lnumber_from(int i) {
     struct lnumber* out = malloc(sizeof(*out));
@@ -118,10 +125,26 @@ static struct lnumber* lnumber_from(int i) {
     return out;
 }
 
+static struct unumber* unumber_from(int i) {
+    struct unumber* out = malloc(sizeof(*out));
+    out->cap = 2;/* We need at least 2 so that *1.5 actually increases stuff */
+    out->data = malloc(sizeof(int) * out->cap);
+    out->len = 1;
+    out->negative = 0;
+    if (i == INT_MIN) {
+        die("from INT_MIN is not supported");
+    } else if (i < 0) {
+        i = -i;
+        out->negative = 1;
+    }
+    out->data[0] = i;
+    return out;
+}
+
 struct number* number_from(int i) {
     struct number* out = malloc(sizeof(*out));
     if (unlimited_numbers) {
-        die("unlimited_numbers are not implemented");
+        out->uptr = unumber_from(i);
     } else {
         out->lptr = lnumber_from(i);
     }
@@ -129,9 +152,22 @@ struct number* number_from(int i) {
 }
 
 
+static void unumber_check (struct unumber* check) {
+    if (check->data == NULL) {
+        die("using an undef number");
+    }
+}
+
 struct number* number_invalid() {
     if (unlimited_numbers) {
-        die("unlimited_numbers are not implemented 2");
+        struct number* n_out = malloc(sizeof(*n_out));
+        struct unumber* u_out = malloc(sizeof(*u_out));
+        n_out->uptr = u_out;
+        u_out->data = NULL;
+        u_out->len = 0;
+        u_out->cap = 0;
+        u_out->negative = 0;
+        return n_out;
     }
     return number_from(-128);
 }
@@ -143,8 +179,13 @@ static struct lnumber* lnumber_copy(struct lnumber* in) {
 }
 
 static struct unumber* unumber_copy(struct unumber* in) {
-    /* TODO */
-    die("unumber copy is not implemented");
+    struct unumber* out = malloc(sizeof(*out));
+    out->len = in->len;
+    out->cap = in->len;
+    out->data = malloc(sizeof(int) * out->cap);
+    out->negative = in->negative;
+    memcpy(out->data, in->data, in->len * sizeof(int));
+    return out;
 }
 
 struct number* number_copy(struct number* in) {
@@ -164,9 +205,99 @@ static void lnumber_add(struct lnumber* in, int i) {
     }
 }
 
+static size_t unumber_new_size(struct unumber* in) {
+    size_t new_size = in->cap;
+    size_t add_size = new_size / 2;
+    if (new_size + add_size > 1000) {
+        add_size = 10;
+    }
+    return new_size + add_size;
+}
+
+static void unumber_enlarge(struct unumber* in, size_t new_size) {
+    int* old_data = in->data;
+    in->data = malloc(sizeof(int) * new_size);
+    in->cap = new_size;
+    memcpy(in->data, old_data, new_size * sizeof(int));
+    free(old_data);
+}
+
+static void unumber_fit_len(struct unumber* in) {
+    while((in->len > 1) && (in->data[in->len-1] == 0)) in->len--;
+}
+
+static void unumber_add(struct unumber* in, unsigned i, int start_offset) {
+    unsigned carry = i;
+    int offset = start_offset;
+    while(carry != 0) {
+        if (offset >= in->cap) {
+            unumber_enlarge(in, unumber_new_size(in));
+        }
+        if (offset >= in->len) {
+            in->len++;
+            in->data[offset] = carry;
+            break;
+        }
+        unsigned long long temp = in->data[offset];
+        temp += carry;
+        unsigned low_end = temp&0xffffffff;
+        unsigned high_end = temp >> 32;
+        in->data[offset] = low_end;
+        carry = high_end;
+        offset++;
+    }
+}
+
+static void unumber_sub(struct unumber* in, unsigned i) {
+    unumber_fit_len(in);
+    if (in->len == 1) {
+        /* Normal subtraction */
+        unsigned* data = in->data;
+        if (*data >= i) {
+            *data -= i;
+            return;
+        } else {
+            unsigned abs_res = i - *data;
+            in->negative = !in->negative;
+            *data = abs_res;
+            return;
+        }
+    }
+    /* We can borrow stuff if we need to */
+    unsigned* data = in->data;
+    while(i > 0) {
+        if (*data >= i) {
+            *data -= i;
+            return;
+        } else {
+            i -= 1;
+            unsigned borrow = 0xffffffff;
+            *data = borrow - i;
+            i = 1;
+            data++;
+        }
+    }
+}
+
+static void unumber_add_sub(struct unumber* in, int i) {
+    if (i == INT_MIN) {
+        die("handling INT_MIN is not supported");
+    }
+    unumber_check(in);
+    if (i < 0 && in->negative) {
+        unumber_add(in, -i, 0);
+    } else if (i > 0 && !in->negative) {
+        unumber_add(in, i, 0);
+    } else if (i > 0 && in->negative) {
+        unumber_sub(in, i);
+    } else if( i < 0 && !in->negative) {
+        unumber_sub(in, -i);
+    }
+}
+
 void number_add(struct number* in, int i) {
     if (unlimited_numbers) {
-        die("unlimited_numbers are not implemented 3");
+        unumber_add_sub(in->uptr, i);
     } else {
         lnumber_add(in->lptr, i);
     }
@@ -179,9 +310,41 @@ static void lnumber_multiply(struct lnumber* in, int i) {
     }
 }
 
+static struct unumber* unumber_multiply(struct unumber* in, int i) {
+    if (i == INT_MIN) {
+        die("hundling INT_MIN is not supported");
+    }
+    unumber_check(in);
+    struct unumber* out = unumber_from(0);
+    if (i < 0) {
+        out->negative = !in->negative;
+        i = -i;
+    }
+
+    unsigned old_overflow = 0;
+    for(int offset = 0; offset < in->len; offset++) {
+        unumber_add(out, old_overflow, offset);
+        unsigned long long full_mul = in->data[offset];
+        full_mul *= i;
+        unsigned low_end = full_mul & 0xffffffff;
+        old_overflow = full_mul >> 32;
+        unumber_add(out, low_end, offset);
+        if (debug) {
+            printf("This is in debug mode\n");
+        }
+    }
+    if (old_overflow != 0)
+        unumber_add(out, old_overflow, in->len);
+
+
+    return out;
+}
+
 void number_multiply(struct number* in, int i) {
     if (unlimited_numbers) {
-        die("unlimited_numbers are not implemented 4");
+        struct unumber* res = unumber_multiply(in->uptr, i);
+        unumber_destroy(in->uptr);
+        in->uptr = res;
     } else {
         lnumber_multiply(in->lptr, i);
     }
@@ -203,9 +366,72 @@ static void lnumber_divide(struct lnumber* in, int i) {
     in->val = divide_round_down(in->val, i);
 }
 
+// Does the real divide (round to 0), so that out * rhs + rem = in
+// If someone needs something different, they can fix that afterwards :P
+// Also does not copy in->negative to out.
+static struct unumber* unumber_divide_rem(struct unumber* in, unsigned* rem, unsigned rhs) {
+
+    unumber_check(in);
+
+    if (in->len == 0) {
+        die("We should not have a number with len 0");
+    }
+
+    struct unumber* out = unumber_from(0);
+    unumber_enlarge(out, in->len);
+    out->len = in->len;
+    unsigned int carry = 0;
+    for (size_t i = in->len; i > 0 ; i--) {
+        if (carry > rhs) {
+            die("BUG in unumber_div");
+        }
+        unsigned int lhs = in->data[i-1];
+        unsigned long long true_lhs = carry;
+        true_lhs <<= 32;
+        true_lhs += lhs;
+        unsigned long long div_res = true_lhs / rhs;
+        if (div_res >> 32) {
+            die("BUG in unumber_div: result should be at offset+1??");
+        }
+        out->data[i-1] = div_res & 0xffffffff;
+        carry = true_lhs % rhs;
+    }
+
+    *rem = carry;
+    return out;
+}
+
+static void unumber_divide(struct number* in, int i) {
+    if (i == INT_MIN) {
+        die("hundling INT_MIN is not supported");
+    }
+    if (i == 0) {
+        die("Dividing by 0 is not allowed");
+    }
+    unumber_check(in->uptr);
+    if (i < 0) {
+        i = -i;
+        in->uptr->negative = !in->uptr->negative;
+    }
+
+    unsigned rem;
+
+    struct unumber* res = unumber_divide_rem(in->uptr, &rem, i);
+    struct unumber* old = in->uptr;
+    in->uptr = res;
+    if (old->negative) {
+        res->negative = 1;
+        if (rem != 0) {
+            unumber_add(res, 1, 0);
+        }
+    }
+
+    unumber_destroy(old);
+}
+
 void number_divide(struct number* in, int i) {
     if (unlimited_numbers) {
-        die("unlimited numbers are not implemented 5");
+        unumber_divide(in, i);
     } else {
         lnumber_divide(in->lptr, i);
     }
@@ -214,9 +440,20 @@ static void lnumber_remainder(struct lnumber* in, int i) {
     in->val %= i;
 }
 
+static void unumber_remainder(struct unumber* in, int i) {
+    if (i <= 0) {
+        die("remainder by negative numbers is not well defined");
+    }
+    unsigned int out;
+    struct unumber* div = unumber_divide_rem(in, &out, i);
+    unumber_destroy(div);
+    in->data[0] = out;
+    in->len = 1;
+}
+
 void number_remainder(struct number* in, int i) {
     if (unlimited_numbers) {
-        die("unlimited numbers are not implemented 6");
+        unumber_remainder(in->uptr, i);
     } else {
         lnumber_remainder(in->lptr, i);
     }
@@ -227,7 +464,8 @@ static void lnumber_destroy(struct lnumber* in) {
 }
 
 static void unumber_destroy(struct unumber* in) {
-    die("unlimited numbers are not destroyable");
+    free(in->data);
+    free(in);
 }
 
 void number_destroy(struct number* in) {
@@ -237,6 +475,25 @@ void number_destroy(struct number* in) {
         lnumber_destroy(in->lptr);
     }
     free(in);
+}
+
+static void unumber_print(struct unumber* in) {
+    unumber_check(in);
+    if (in->len == 1) {
+        if (in->negative) {
+            die("Printing negative numbers is not implemented"); /* TODO */
+        }
+        if (in->data[0] < 10) {
+            printf("%u", in->data[0]);
+            return;
+        }
+        if (in->data[0] != 10 && in->data[0] < 32) {
+            return;
+        }
+    }
+    if(printf("%lc", in->data[0] & 0xffff) < 0) {
+        perror("Foo");
+    }
 }
 
 static void lnumber_print(struct lnumber* in) {
@@ -253,7 +510,7 @@ static void lnumber_print(struct lnumber* in) {
 
 void number_print(struct number* in) {
     if(unlimited_numbers) {
-        die("unlimited numbers are not implemented 7");
+        unumber_print(in->uptr);
     } else {
         lnumber_print(in->lptr);
     }
@@ -263,9 +520,19 @@ static void lnumber_print_dbg(struct lnumber* in) {
     printf("%lld", in->val);
 }
 
+static void unumber_print_dbg(struct unumber* in) {
+    printf("{ \n .cap = %lu,\n .len = %lu,\n .neg = %d\n .data = {", in->cap, in->len, in->negative);
+    const char* sep = "";
+    for (int i=0; i < in->len; ++i){
+        printf("%s%u", sep, in->data[i]);
+        sep = ", ";
+    }
+    printf("}}\n");
+}
+
 void number_print_dbg(struct number* in) {
     if (unlimited_numbers) {
-        die("unlimted numbers are not implemented 8");
+        unumber_print_dbg(in->uptr);
     } else {
         lnumber_print_dbg(in->lptr);
     }
@@ -276,7 +543,53 @@ static int lnumber_compare(struct lnumber* lhs, struct lnumber* rhs) {
 }
 
 static int unumber_compare(struct unumber* lhs, struct unumber* rhs) {
-    die("unlimited compare is not implemented");
+    unumber_check(lhs);
+    unumber_check(rhs);
+    unumber_fit_len(lhs);
+    unumber_fit_len(rhs);
+    // check -0 vs 0
+    if (lhs->len == 1 && rhs->len == 1 && lhs->data[0] == 0 && rhs->data[0] == 0) {
+        return 0;
+    }
+
+    // check signs
+    if (lhs->negative && !rhs->negative) {
+        return -1;
+    }
+    if (rhs->negative && !lhs->negative) {
+        return 1;
+    }
+
+    // They have the same sign
+    if (rhs->negative) {
+        // if they are negative, their result are inverted:
+        // 5 > 3, but -5 < -3.
+        // To evaluate if -5 <=> -3, we can also evaluate 3 <=> 5 [both are -1]
+        struct unumber* tmp = lhs;
+        lhs = rhs;
+        rhs = tmp;
+    }
+
+    if (lhs->len > rhs->len) {
+        return 1;
+    }
+    if (rhs->len > lhs->len) {
+        return -1;
+    }
+
+    // Their lengths are also equal
+    for(int i = 0; i < rhs->len; ++i) {
+        int offset = rhs->len - 1 - i;
+        if (lhs->data[offset] < rhs->data[offset]) {
+            return -1;
+        }
+        if (lhs->data[offset] > rhs->data[offset]) {
+            return 1;
+        }
+    }
+
+    // They are equal
+    return 0;
 }
 
 int number_compare(struct number* lhs, struct number* rhs) {
@@ -373,4 +686,8 @@ void function_cleanup() {
 
 void naz_set_unlimited(int in) {
     unlimited_numbers = in;
+}
+
+void naz_set_debug(int in) {
+    debug = in;
 }
