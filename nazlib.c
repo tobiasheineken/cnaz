@@ -215,10 +215,11 @@ static size_t unumber_new_size(struct unumber* in) {
 }
 
 static void unumber_enlarge(struct unumber* in, size_t new_size) {
-    int* old_data = in->data;
-    in->data = malloc(sizeof(int) * new_size);
+    unsigned int* old_data = in->data;
+    in->data = malloc(sizeof(unsigned int) * new_size);
+    size_t min_size = (in->cap < new_size)? in->cap : new_size;
     in->cap = new_size;
-    memcpy(in->data, old_data, new_size * sizeof(int));
+    memcpy(in->data, old_data, min_size * sizeof(unsigned int));
     free(old_data);
 }
 
