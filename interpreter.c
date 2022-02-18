@@ -217,7 +217,7 @@ static void execute() {
                               accumulator_set(acc);
                               break;
                           }
-                case 'q': {
+                case 'p': {
                               struct number* acc = accumulator_get();
                               number_remainder(acc, next_code[offset] - '0');
                               accumulator_set(acc);
