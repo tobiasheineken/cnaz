@@ -24,4 +24,6 @@ The following list shows all the additional restriction for naz programs to be e
 - Comments and spaces cannot be placed between the number and the operand. `1r 1o` is fine, `1 r1o` is not.
 - Special opcode blocks (`1xNf`; `2xNv`; `3xNvMg` ; `3xNvMe` and `3xNvMl`) cannot be interrupted by spaces or comments
 - Error checking is less strict, for example loading an undefined variable will not (necessarily) result in an exception
-- No command line flags are supported
+- Only -u as a command line option is supported
+- Contrary to the default naz -u interpreter, Unicode codepoints from 0x10000 to 0x10ffff cannot displayed.
+	Trying to do so using two Unicode Surrogate codepoints (0xd800 to 0xdfff) like [here](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/fromCharCode) will fail.

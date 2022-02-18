@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "nazlib.h"
 
-static void usage(char* self) {
-    fprintf(stderr, "Usage: %s <file>\n File needs to be the .naz file to execute. All flags are currently not supported\n", self);
+static void usage(const char* self) {
+    fprintf(stderr, "Usage: %s [-u] <file>\n File needs to be the .naz file to execute.\n Use -u to enable unlimited numbers.\n All other flags are currently not supported\n", self);
     exit(EXIT_FAILURE);
 }
 
@@ -275,13 +276,25 @@ cleanup_forloop:
 }
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        usage(argv[0]);
+
+    int c;
+    const char* self_name = argv[0];
+    while ((c = getopt(argc, argv, "u")) != -1) {
+        switch(c) {
+            case 'u': naz_set_unlimited(1);
+                      break;
+            default: usage(self_name);
+        }
+    }
+    argc -= optind;
+    argv += optind;
+    if (argc != 1) {
+        usage(self_name);
     }
 
     variable_init();
 
-    char* program = read_file(argv[1]);
+    char* program = read_file(argv[0]);
 
     int is_comment = 0;
     for(int offset = 0; program[offset] != '\0'; ) {
