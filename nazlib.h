@@ -87,3 +87,8 @@ _Noreturn void die(const char msg[]);
 /** -u */
 /* Has to be called before variable_init() */
 void naz_set_unlimited(int);
+
+/** Read */
+int read_by_offset(int);
+void debug_io_state();
+

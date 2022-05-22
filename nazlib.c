@@ -692,3 +692,99 @@ void naz_set_unlimited(int in) {
 void naz_set_debug(int in) {
     debug = in;
 }
+
+
+struct in_state {
+    int data[10];
+    int start;
+    int end;
+    int size;
+} io = {.start = 0, .end = 0, .size = 0, .data[5] = 1};
+
+static void normalize_io_ptr(int* ptr) {
+    int sz = sizeof(io.data) / sizeof(int);
+    while (*ptr >= sz) {
+        *ptr -= sz;
+    }
+    while(*ptr < 0) {
+        *ptr += sz;
+    }
+}
+
+static void push_in(int read) {
+    if (io.size > 9 || io.size < 0) {
+        die("Pushing IO with wrong sizes");
+    }
+    io.data[io.end++] = read;
+    io.size++;
+    normalize_io_ptr(&io.end);
+}
+
+static int pop_in() {
+    if (io.size < 1) {
+        die("Popping empty IO");
+    }
+    io.size--;
+    int ret = io.data[io.start++];
+    normalize_io_ptr(&io.start);
+    return ret;
+}
+
+static int in_get_and_remove(int position) {
+    int access = io.start + position;
+    normalize_io_ptr(&access);
+    int ret = io.data[access];
+    if (position < 1.0 * io.size / 2) {
+        // In the first half, i.e. easiest to move right
+	if (access >= io.start) {
+            for(;access > io.start;access--) {
+                io.data[access] = io.data[access - 1];
+	    }
+	    pop_in();
+	    return ret;
+	} else {
+            die("NOT IMPLEMENTED");
+	}
+    } else {
+        // In the second half, i.e. easiest to move left
+        if (access < io.end) {
+            for(;access < io.end - 1;access++) {
+                io.data[access] = io.data[access + 1];
+	    }
+	    io.end--;
+	    io.size--;
+	    return ret;
+	} else {
+            die("NOT IMPLEMENTED'2");
+        }
+    }
+}
+
+int read_by_offset(int position) {
+    if (position < 1) {
+        die("0r is not a valid command");
+    }
+    if (position <= io.size) {
+        // We already did read this byte from stdin
+	// We just have to report it correctly
+	return in_get_and_remove(position - 1);
+    }
+    position -= io.size;
+    for(;position > 1; position--) {
+        push_in(getchar());
+    }
+    if (position != 1)
+      die("R for anything else than 1st should not reach here");
+    int res = getchar();
+    return res;
+}
+
+void debug_io_state() {
+    const char* sep = "{";
+
+    for(int i=0; i < 10; ++i) {
+        printf("%s.data[%d] = %d", sep, i, io.data[i]);
+	sep = ", ";
+    }
+    printf(", .start = %d, .end = %d, .size = %d \n", io.start, io.end, io.size);
+}

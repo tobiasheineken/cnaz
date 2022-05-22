@@ -29,6 +29,7 @@ void debug() {
         number_destroy(tmp);
         printf("\n");
     }
+    debug_io_state();
 
     printf("Acc: ");
     struct number* tmp = accumulator_get();
@@ -234,9 +235,7 @@ static void execute() {
                           }
                 case 'r': {
                               int position = next_code[offset] - '0';
-                              if (position != 1)
-                                die("R for anything else than 1st is unimplemented for now");
-                              int res = getchar();
+                              int res = read_by_offset(position);
                               struct number *acc = number_from(res);
                               accumulator_set(acc);
                               break;
