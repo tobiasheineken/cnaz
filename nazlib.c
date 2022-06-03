@@ -736,25 +736,25 @@ static int in_get_and_remove(int position) {
     int ret = io.data[access];
     if (position < 1.0 * io.size / 2) {
         // In the first half, i.e. easiest to move right
-	if (access >= io.start) {
+        if (access >= io.start) {
             for(;access > io.start;access--) {
                 io.data[access] = io.data[access - 1];
-	    }
-	    pop_in();
-	    return ret;
-	} else {
+            }
+            pop_in();
+            return ret;
+        } else {
             die("NOT IMPLEMENTED");
-	}
+        }
     } else {
         // In the second half, i.e. easiest to move left
         if (access < io.end) {
             for(;access < io.end - 1;access++) {
                 io.data[access] = io.data[access + 1];
-	    }
-	    io.end--;
-	    io.size--;
-	    return ret;
-	} else {
+            }
+            io.end--;
+            io.size--;
+            return ret;
+        } else {
             die("NOT IMPLEMENTED'2");
         }
     }
@@ -766,8 +766,8 @@ int read_by_offset(int position) {
     }
     if (position <= io.size) {
         // We already did read this byte from stdin
-	// We just have to report it correctly
-	return in_get_and_remove(position - 1);
+        // We just have to report it correctly
+        return in_get_and_remove(position - 1);
     }
     position -= io.size;
     for(;position > 1; position--) {
@@ -784,7 +784,7 @@ void debug_io_state() {
 
     for(int i=0; i < 10; ++i) {
         printf("%s.data[%d] = %d", sep, i, io.data[i]);
-	sep = ", ";
+        sep = ", ";
     }
     printf(", .start = %d, .end = %d, .size = %d \n", io.start, io.end, io.size);
 }
