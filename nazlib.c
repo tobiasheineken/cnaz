@@ -701,8 +701,10 @@ struct in_state {
     int size;
 } io = {.start = 0, .end = 0, .size = 0, .data[5] = 1};
 
+#define ARRAYSZ(X) (sizeof(X) / sizeof(X[0]))
+
 static void normalize_io_ptr(int* ptr) {
-    int sz = sizeof(io.data) / sizeof(int);
+    int sz = ARRAYSZ(io.data);
     while (*ptr >= sz) {
         *ptr -= sz;
     }
@@ -743,7 +745,18 @@ static int in_get_and_remove(int position) {
             pop_in();
             return ret;
         } else {
-            die("NOT IMPLEMENTED");
+            for (; access > 0; access--) {
+                io.data[access] = io.data[access - 1];
+            }
+            /* io.start can be the last item, but who cares */
+            io.data[0] = io.data[ARRAYSZ(io.data)-1];
+            for(access = ARRAYSZ(io.data)-1; access > io.start; access--) {
+                io.data[access] = io.data[access-1];
+            }
+            io.start++;
+            normalize_io_ptr(&io.start);
+            io.size--;
+            return ret;
         }
     } else {
         // In the second half, i.e. easiest to move left
@@ -752,11 +765,24 @@ static int in_get_and_remove(int position) {
                 io.data[access] = io.data[access + 1];
             }
             io.end--;
-            io.size--;
-            return ret;
         } else {
-            die("NOT IMPLEMENTED'2");
+
+            for(;access < ARRAYSZ(io.data) - 1; access++) {
+                io.data[access] = io.data[access + 1];
+            }
+            if (0 < io.end) {
+                io.data[ARRAYSZ(io.data) - 1] = io.data[0];
+            }
+            for(access = 0; access < io.end - 1; access++) {
+                io.data[access] = io.data[access + 1];
+            }
+            io.end--;
+            if (io.end < 0) {
+                io.end += ARRAYSZ(io.data);
+            }
         }
+        io.size--;
+        return ret;
     }
 }
 
@@ -787,4 +813,13 @@ void debug_io_state() {
         sep = ", ";
     }
     printf(", .start = %d, .end = %d, .size = %d \n", io.start, io.end, io.size);
+    printf("Interpreted: \n");
+    sep = "";
+    for(int i=0; i < io.size; ++i) {
+        int acc = io.start + i;
+        normalize_io_ptr(&acc);
+        printf("%s[%d] = %d", sep, i, io.data[acc]);
+        sep = ", ";
+    }
+    printf("\n");
 }
