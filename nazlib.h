@@ -78,7 +78,7 @@ void variable_cleanup();
 /** FUNCTIONS */
 const char* function_get(int number);
 /* Does NOT take ownership of the string */
-const char* function_set(int number, const char*);
+void function_set(int number, const char*);
 
 void function_cleanup();
 

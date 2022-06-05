@@ -654,7 +654,7 @@ const char* function_get(int number) {
     return functions[number];
 }
 /* Does NOT take ownership of the string */
-const char* function_set(int number, const char* string) {
+void function_set(int number, const char* string) {
     if (functions[number]) {
         fprintf(stderr, "Redefining function %d, aborting\n", number);
         exit(EXIT_FAILURE);
